@@ -134,22 +134,26 @@ void loop() {
     visited[bro.y][bro.x] = true;
     Stacc debris{};
     debris.push_front(Pixel{bro.x,bro.y});
-    while (!debris.isEmpty()){
+    for (int loops = 0; loops < 10; loops++){
+      if (debris.isEmpty()){
+        Serial.println("OOOFFFF!");
+        break;
+      }
       // Serial.println("not MT");
       int t = debris.size;
       frame[0] = frame[1] = frame[2] = 0;
       for (int c = 0; c < t; c++){
         Pixel cur = debris.pop_front();
-        //if (random(0, abs(bro.x - cur.x) + abs(bro.y - cur.y)) < 1){
+        if (random(0, loops + 1) <= 1){
           cur.draw();
-        //}
+        }
         last_x = cur.x;
         last_y = cur.y;
         for (int dir = 0; dir < 4; dir++){
           Pixel new_pixel = cur.copy();
           new_pixel.mov(dx[dir], dy[dir]);
           // Serial.print(new_pixel.x);
-          // Serial.print("and ");
+          // Serial.print(" and ");
           // Serial.println (new_pixel.y);
           if (!new_pixel.already_seen(visited) ){
             debris.push_back(new_pixel);
@@ -157,16 +161,17 @@ void loop() {
           }
         }
       }
-
+      delay(10 + 10 * loops);
       matrix.loadFrame(frame);  
-      delay(40);
+      
     }
-    bro = Pixel(last_x,last_y);
+    //bro = Pixel(last_x,last_y);
+    bro = Pixel(random(0,8),random(0,12));
     Serial.println("new blob");
   }
   
   
-  matrix.loadFrame(frame);  
+  matrix.loadFrame(frame);
   
   delay(300);
 }
