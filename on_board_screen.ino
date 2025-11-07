@@ -28,7 +28,7 @@ struct Pixel {
   Pixel() : x(0), y(0) {} 
   Pixel(int equis, int ygr) : x(equis), y(ygr) {} 
   
-  void move(int dx, int dy){
+  void mov(int dx, int dy){
     x = (12 + dx + x) % 12;
     y = (8 + dy + y) % 8;  
   }
@@ -36,33 +36,70 @@ struct Pixel {
   void draw(){
     setPixel(frame, x, y, true);
   }
+  Pixel copy(){
+    return Pixel{x,y};
+  }
+  bool already_seen(bool board[8][12]){
+    return board[y][x];
+  }
 };
 
-struct Stacc {
+struct Stacc{
   static const int MAX = 140;
-  int top;
+  int front_idx;
+  int back_idx;
+  int size;
   Pixel data[MAX];
   
+  Stacc() : front_idx(0), back_idx(0), size(0) {}
   
-  Stacc() : top(-1) {}
-  
-  void push(Pixel p){
-    if (top < MAX - 1){
-      data[++top] = p;
+  void push_back(Pixel p) {
+    if (size >= MAX) {
+      Serial.println("PALMASO: Deque full");
+      return;
     }
+    data[back_idx] = p;
+    back_idx = (back_idx + 1) % MAX;
+    size++;
   }
   
-  Pixel pop(){
-    if (top >= 0){
-      return data[top--];
+  void push_front(Pixel p) {
+    if (size >= MAX) {
+      Serial.println("PALMASO: Deque full");
+      return;
     }
-    Serial.println("PALMASO");
-    return Pixel{-1, -1};  
+    front_idx = (front_idx - 1 + MAX) % MAX;
+    data[front_idx] = p;
+    size++;
   }
   
-  bool isEmpty(){
-    return top == -1;
+  Pixel pop_back() {
+    if (size == 0) {
+      Serial.println("PALMASO: Deque empty");
+      return Pixel{-1, -1};
+    }
+    back_idx = (back_idx - 1 + MAX) % MAX;
+    size--;
+    return data[back_idx];
   }
+  
+  Pixel pop_front() {
+    if (size == 0) {
+      Serial.println("PALMASO: Deque empty");
+      return Pixel{-1, -1};
+    }
+    Pixel p = data[front_idx];
+    front_idx = (front_idx + 1) % MAX;
+    size--;
+    return p;
+  }
+  
+  Pixel& operator[](int idx) {
+    return data[(front_idx + idx) % MAX];
+  }
+  
+  int length() { return size; }
+  bool isEmpty() { return size == 0; }
 };
 
 struct Blob {
@@ -81,16 +118,55 @@ void setup() {
   randomSeed(analogRead(0));
 }
 
+int dx[] = {0, -1, 0, 1};
+int dy[] = {1, 0, -1, 0};
 void loop() {
   frame[0] = frame[1] = frame[2] = 0;
+  if (random(0,14) != 13){
+    int dir_x = random(-1, 2); 
+    int dir_y = random(-1, 2);
+    bro.mov(dir_x, dir_y);
+    bro.draw();
+  }else{
+    int last_x;
+    int last_y;
+    bool visited[8][12] = {false};
+    visited[bro.y][bro.x] = true;
+    Stacc debris{};
+    debris.push_front(Pixel{bro.x,bro.y});
+    while (!debris.isEmpty()){
+      // Serial.println("not MT");
+      int t = debris.size;
+      frame[0] = frame[1] = frame[2] = 0;
+      for (int c = 0; c < t; c++){
+        Pixel cur = debris.pop_front();
+        //if (random(0, abs(bro.x - cur.x) + abs(bro.y - cur.y)) < 1){
+          cur.draw();
+        //}
+        last_x = cur.x;
+        last_y = cur.y;
+        for (int dir = 0; dir < 4; dir++){
+          Pixel new_pixel = cur.copy();
+          new_pixel.mov(dx[dir], dy[dir]);
+          // Serial.print(new_pixel.x);
+          // Serial.print("and ");
+          // Serial.println (new_pixel.y);
+          if (!new_pixel.already_seen(visited) ){
+            debris.push_back(new_pixel);
+            visited[new_pixel.y][new_pixel.x] = true;
+          }
+        }
+      }
+
+      matrix.loadFrame(frame);  
+      delay(40);
+    }
+    bro = Pixel(last_x,last_y);
+    Serial.println("new blob");
+  }
   
-  int dir_x = random(-1, 2); 
-  int dir_y = random(-1, 2);
-  
-  bro.move(dir_x, dir_y);
-  bro.draw();
   
   matrix.loadFrame(frame);  
   
-  delay(500);
+  delay(300);
 }
